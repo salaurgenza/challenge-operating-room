@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Challenge Operating Room</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    #login-section, #quiz-section { max-width: 600px; margin: auto; }
+    #quiz-section { display: none; }
+    label { display: block; margin: 0.5em 0; }
+    button { margin-top: 1em; padding: 0.5em 1em; }
+    #logout { cursor: pointer; color: blue; text-decoration: underline; margin-top: 1em; display: inline-block;}
+  </style>
+</head>
+<body>
+
+  <div id="login-section">
+    <h2>Login - Challenge Operating Room</h2>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button id="btn-login">Login / Register</button>
+    <p id="login-msg" style="color:red;"></p>
+  </div>
+
+  <div id="quiz-section">
+    <h2>Quiz Form</h2>
+    <!-- QUIZ example -->
+    <form id="quiz-form">
+      <p>1. Check the correct option:</p>
+      <label><input type="checkbox" name="q1" value="a"> Option A</label>
+      <label><input type="checkbox" name="q1" value="b"> Option B</label>
+      <label><input type="checkbox" name="q1" value="c"> Option C</label>
+      <button type="submit">Submit</button>
+    </form>
+    <div id="response-msg" style="margin-top: 1em; color: green;"></div>
+    <span id="logout">Logout</span>
+  </div>
+
+  <script src="./firebaseConfig.js"></script>
+  <script>
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const loginSection = document.getElementById('login-section');
+    const quizSection = document.getElementById('quiz-section');
+    const loginMsg = document.getElementById('login-msg');
+    const btnLogin = document.getElementById('btn-login');
+    const logoutLink = document.getElementById('logout');
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        loginSection.style.display = 'none';
+        quizSection.style.display = 'block';
+      } else {
+        loginSection.style.display = 'block';
+        quizSection.style.display = 'none';
+      }
+    });
+
+    btnLogin.addEventListener('click', () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      loginMsg.textContent = '';
+      if (!email || !password) {
+        loginMsg.textContent = 'Please enter email and password';
+        return;
+      }
+      auth.signInWithEmailAndPassword(email, password)
+        .catch(error => {
+          if (error.code === 'auth/user-not-found') {
+            auth.createUserWithEmailAndPassword(email, password)
+              .catch(err => loginMsg.textContent = err.message);
+          } else {
+            loginMsg.textContent = error.message;
+          }
+        });
+    });
+
+    logoutLink.addEventListener('click', () => {
+      auth.signOut();
+    });
+
+    const quizForm = document.getElementById('quiz-form');
+    const responseMsg = document.getElementById('response-msg');
+    quizForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = auth.currentUser;
+      if (!user) {
+        responseMsg.textContent = 'You must be logged in';
+        return;
+      }
+      const formData = new FormData(quizForm);
+      let answers = {};
+      for (const [key, value] of formData.entries()) {
+        answers[key] = value;
+      }
+      try {
+        await db.collection('users').doc(user.uid).set({
+          answers: answers,
+          timestamp: new Date()
+        });
+        responseMsg.textContent = 'Risposte salvate con successo!';
+      } catch (error) {
+        responseMsg.textContent = 'Errore nel salvataggio: ' + error.message;
+      }
+    });
+  </script>
+
+</body>
+</html>
